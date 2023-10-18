@@ -158,6 +158,7 @@ const createDashboard = async (testId, ecsCloudWatchLogGroup, taskCluster, regio
   const cloudwatch = new AWS.CloudWatch(options);
   const cloudwatchLogs = new AWS.CloudWatchLogs(options);
   let widgets = [];
+  let metricPromises = [];
   const widgetPlacement = [
     [8, 0],
     [0, 8],
@@ -182,7 +183,9 @@ const createDashboard = async (testId, ecsCloudWatchLogGroup, taskCluster, regio
         },
       ],
     };
-    await cloudwatchLogs.putMetricFilter(metricFilterParams).promise();
+
+    metricPromises.push(cloudwatchLogs.putMetricFilter(metricFilterParams).promise());
+
     //create widget
     let query = `SOURCE '${ecsCloudWatchLogGroup}'| limit 10000 | \
                 fields @logStream | \
@@ -206,6 +209,9 @@ const createDashboard = async (testId, ecsCloudWatchLogGroup, taskCluster, regio
     };
     widgets.push(widget);
   }
+
+  await Promise.all(metricPromises);
+
   //create dashboard
   const dashboardBody = { widgets: widgets };
   await cloudwatch
@@ -287,7 +293,7 @@ exports.handler = async (event, context) => {
   try {
     //if not yet created by previous call, create widgets and dashboard
     if (!event.taskIds) {
-      createDashboard(testId, ecsCloudWatchLogGroup, taskCluster, region);
+      await createDashboard(testId, ecsCloudWatchLogGroup, taskCluster, region);
     }
 
     params.count = 10;
